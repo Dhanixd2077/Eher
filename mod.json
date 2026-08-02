@@ -8,12 +8,16 @@
 	},
 	"id": "hjfod.trashcan",
 	"name": "Trashcan",
-	"version": "1.3.0",
+	"version": "1.3.1",
 	"developers": [
     "SMJS",
     "HJfod"
   ],
 	"description": "Deleting levels puts them in a trashcan",
+  "links": {
+    "source": "https://github.com/SMJSProductions/Object-Collab",
+		"community": "https://discord.gg/EDkFkAv66K"
+  },
 	"dependencies": {
 		"geode.node-ids": ">=1.23.3",
 		"hjfod.gmd-api": ">=1.5.0"
