@@ -9,39 +9,39 @@ static const std::string METADATA_FILE = "metadata.json";
 static const std::string TRASH_ITEMS_KEY = "trash-times";
 
 static std::string convertToKebabCase(const std::string_view string) {
-	std::string result;
-	char last = '\0';
+    std::string result;
+    char last = '\0';
 
-	for (char c : string) {
-		// Add a dash if the character is in uppercase (camelCase / PascalCase)
-		// or a space (Normal case) or an underscore (snake_case) and the
-		// built result string isn't empty and make sure there's only a
-		// singular dash
-		// Don't add a dash if the previous character was also uppercase or a
-		// number (SCREAM1NG L33TCASE should be just scream1ng-l33tcase)
-		if (result.size() && result.back() != '-' && (
+    for (char c : string) {
+        // Add a dash if the character is in uppercase (camelCase / PascalCase)
+        // or a space (Normal case) or an underscore (snake_case) and the
+        // built result string isn't empty and make sure there's only a
+        // singular dash
+        // Don't add a dash if the previous character was also uppercase or a
+        // number (SCREAM1NG L33TCASE should be just scream1ng-l33tcase)
+        if (result.size() && result.back() != '-' && (
             (std::isupper(c) && !(std::isupper(last) || std::isdigit(last))) ||
             std::isspace(c) ||
             c == '_'
         )) {
             result.push_back('-');
-		}
+        }
 
-		// Only preserve alphanumeric characters
-		if (std::isalnum(c)) {
+        // Only preserve alphanumeric characters
+        if (std::isalnum(c)) {
             result.push_back(std::tolower(c));
         }
 
-		last = c;
-	}
+        last = c;
+    }
 
-	// If there is a dash at the end (for example because the name ended in a
-	// space) then get rid of that
-	if (result.back() == '-') {
+    // If there is a dash at the end (for example because the name ended in a
+    // space) then get rid of that
+    if (result.back() == '-') {
         result.pop_back();
     }
 
-	return result;
+    return result;
 }
 
 static std::string correctReservedFilenames(std::string name) {

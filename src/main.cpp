@@ -7,37 +7,37 @@
 using namespace geode::prelude;
 
 struct $modify(GameLevelManager) {
-	$override void deleteLevel(GJGameLevel* level) {
-		if (level->m_levelType == GJLevelType::Editor) {
-			if (Result<> result = Trashcan::get()->trash(level); result.isErr()) {
-				FLAlertLayer::create(
-					"Error Trashing Level",
-					fmt::format("Unable to move level to trash: {}", std::move(result).unwrapErr()),
-					"OK"
-				)->show();
-			}
+    $override void deleteLevel(GJGameLevel* level) {
+        if (level->m_levelType == GJLevelType::Editor) {
+            if (Result<> result = Trashcan::get()->trash(level); result.isErr()) {
+                FLAlertLayer::create(
+                    "Error Trashing Level",
+                    fmt::format("Unable to move level to trash: {}", std::move(result).unwrapErr()),
+                    "OK"
+                )->show();
+            }
 
-			return;
-		}
+            return;
+        }
 
-		GameLevelManager::deleteLevel(level);
-	}
+        GameLevelManager::deleteLevel(level);
+    }
 
-	$override void deleteLevelList(GJLevelList* list) {
-		if (list->m_listType == GJLevelType::Editor) {
-			if (Result<> result = Trashcan::get()->trash(list); result.isErr()) {
-				FLAlertLayer::create(
-					"Error Trashing List",
-					fmt::format("Unable to move list to trash: {}", std::move(result).unwrapErr()),
-					"OK"
-				)->show();
-			}
+    $override void deleteLevelList(GJLevelList* list) {
+        if (list->m_listType == GJLevelType::Editor) {
+            if (Result<> result = Trashcan::get()->trash(list); result.isErr()) {
+                FLAlertLayer::create(
+                    "Error Trashing List",
+                    fmt::format("Unable to move list to trash: {}", std::move(result).unwrapErr()),
+                    "OK"
+                )->show();
+            }
 
-			return;
-		}
+            return;
+        }
 
-		GameLevelManager::deleteLevelList(list);
-	}
+        GameLevelManager::deleteLevelList(list);
+    }
 };
 
 class $modify(TrashBrowserLayer, LevelBrowserLayer) {
@@ -45,7 +45,7 @@ class $modify(TrashBrowserLayer, LevelBrowserLayer) {
         ListenerHandle listener;
     };
 
-	$override bool init(GJSearchObject* search) {
+    $override bool init(GJSearchObject* search) {
         if (!LevelBrowserLayer::init(search)) return false;
         if (search->m_searchType != SearchType::MyLevels) return true;
 
@@ -73,7 +73,7 @@ class $modify(TrashBrowserLayer, LevelBrowserLayer) {
     }
 
     $override void onDeleteSelected(CCObject* sender) {
-		if (m_searchObject->m_searchType != SearchType::MyLevels) return LevelBrowserLayer::onDeleteSelected(sender);
+        if (m_searchObject->m_searchType != SearchType::MyLevels) return LevelBrowserLayer::onDeleteSelected(sender);
 
         size_t count = 0;
 
@@ -105,8 +105,8 @@ class $modify(TrashBrowserLayer, LevelBrowserLayer) {
     }
 
     void onTrashcan(CCObject*) {
-		if (!Trashcan::get()->isLoaded()) {
-			if (Result<> result = Trashcan::get()->load(); result.isErr()) {
+        if (!Trashcan::get()->isLoaded()) {
+            if (Result<> result = Trashcan::get()->load(); result.isErr()) {
                 log::warn("{}", result.unwrapErr());
 
                 Notification::create(
@@ -117,12 +117,12 @@ class $modify(TrashBrowserLayer, LevelBrowserLayer) {
             } else {
                 this->onTrashcan(nullptr);
             }
-		} else if (Trashcan::get()->getItems().empty()) {
+        } else if (Trashcan::get()->getItems().empty()) {
             FLAlertLayer::create(
                 "Trash is Empty",
                 "You have not <co>trashed</c> any levels!",
                 "OK"
-		    )->show();
+            )->show();
         } else {
             TrashcanPopup::create()->show();
         }
@@ -130,7 +130,7 @@ class $modify(TrashBrowserLayer, LevelBrowserLayer) {
 };
 
 class $modify(EditLevelLayer) {
-	$override void confirmDelete(CCObject*) {
+    $override void confirmDelete(CCObject*) {
         FLAlertLayer* alert = FLAlertLayer::create(
             this,
             "Trash level",
@@ -141,7 +141,7 @@ class $modify(EditLevelLayer) {
         );
 
         alert->setTag(4);
-		alert->m_button2->updateBGImage("GJ_button_06.png");
+        alert->m_button2->updateBGImage("GJ_button_06.png");
         alert->show();
     }
 };

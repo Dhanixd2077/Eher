@@ -1,28 +1,28 @@
 {
-	"geode": "5.7.1",
-	"gd": {
-		"win": "2.2081",
-		"android": "2.2081",
-		"mac": "2.2081",
-		"ios": "2.2081"
-	},
-	"id": "hjfod.trashcan",
-	"name": "Trashcan",
-	"version": "1.3.1",
-	"developers": [
+  "geode": "5.8.2",
+  "gd": {
+    "win": "2.2081",
+    "android": "2.2081",
+    "mac": "2.2081",
+    "ios": "2.2081"
+  },
+  "id": "hjfod.trashcan",
+  "name": "Trashcan",
+  "version": "1.3.2",
+  "developers": [
     "SMJS",
     "HJfod"
   ],
-	"description": "Deleting levels puts them in a trashcan",
+  "description": "Deleting levels puts them in a trashcan",
   "links": {
-    "source": "https://github.com/SMJSProductions/Object-Collab",
-		"community": "https://discord.gg/EDkFkAv66K"
+    "source": "https://github.com/SMJSProductions/LevelTrashcan",
+    "community": "https://discord.gg/EDkFkAv66K"
   },
-	"dependencies": {
-		"geode.node-ids": ">=1.23.3",
-		"hjfod.gmd-api": ">=1.5.0"
-	},
-	"tags": [
+  "dependencies": {
+    "geode.node-ids": ">=1.23.3",
+    "hjfod.gmd-api": ">=1.5.0"
+  },
+  "tags": [
     "universal",
     "offline"
   ]
