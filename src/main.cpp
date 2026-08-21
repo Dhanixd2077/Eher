@@ -1,147 +1,205 @@
-#include <Geode/modify/GameLevelManager.hpp>
-#include <Geode/modify/LevelBrowserLayer.hpp>
-#include <Geode/modify/EditLevelLayer.hpp>
-#include "Trash.hpp"
-#include "TrashcanPopup.hpp"
+#include <Geode/Geode.hpp>
+#include <Geode/modify/MenuLayer.hpp>
+#include <fmod.hpp>
+#include <algorithm>
+#include <iomanip>
 
 using namespace geode::prelude;
 
-struct $modify(GameLevelManager) {
-    $override void deleteLevel(GJGameLevel* level) {
-        if (level->m_levelType == GJLevelType::Editor) {
-            if (Result<> result = Trashcan::get()->trash(level); result.isErr()) {
-                FLAlertLayer::create(
-                    "Error Trashing Level",
-                    fmt::format("Unable to move level to trash: {}", std::move(result).unwrapErr()),
-                    "OK"
-                )->show();
-            }
 
-            return;
+float g_zoomMax = 1.0f;
+float g_bassIntensity = 0.9f;
+float g_shakeIntensity = 12.0f;
+
+class MySettingsLayer : public FLAlertLayer {
+    TextInput* m_zoomInput;
+    TextInput* m_intensityInput;
+    TextInput* m_shakeInput;
+
+public:
+    static MySettingsLayer* create() {
+        auto ret = new MySettingsLayer();
+        if (ret && ret->init(150)) {
+            ret->autorelease();
+            return ret;
         }
-
-        GameLevelManager::deleteLevel(level);
+        CC_SAFE_DELETE(ret);
+        return nullptr;
     }
 
-    $override void deleteLevelList(GJLevelList* list) {
-        if (list->m_listType == GJLevelType::Editor) {
-            if (Result<> result = Trashcan::get()->trash(list); result.isErr()) {
-                FLAlertLayer::create(
-                    "Error Trashing List",
-                    fmt::format("Unable to move list to trash: {}", std::move(result).unwrapErr()),
-                    "OK"
-                )->show();
-            }
+    bool init(int bgOpacity) {
+        if (!FLAlertLayer::init(bgOpacity)) return false;
 
-            return;
-        }
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        
+        auto bg = CCScale9Sprite::create("GJ_square04.png");
+        bg->setContentSize({ 280, 240 });
+        bg->setPosition(winSize / 2);
+        m_mainLayer->addChild(bg);
 
-        GameLevelManager::deleteLevelList(list);
-    }
-};
+        m_buttonMenu = CCMenu::create();
+        m_mainLayer->addChild(m_buttonMenu);
 
-class $modify(TrashBrowserLayer, LevelBrowserLayer) {
-    struct Fields {
-        ListenerHandle listener;
-    };
+        auto title = CCLabelBMFont::create("Settings", "goldFont.fnt");
+        title->setPosition({ winSize.width / 2, winSize.height / 2 + 100 });
+        title->setScale(0.7f);
+        m_mainLayer->addChild(title);
 
-    $override bool init(GJSearchObject* search) {
-        if (!LevelBrowserLayer::init(search)) return false;
-        if (search->m_searchType != SearchType::MyLevels) return true;
+        g_zoomMax = Mod::get()->getSavedValue<float>("save_zoom", 1.0f);
+        g_bassIntensity = Mod::get()->getSavedValue<float>("save_intensity", 0.9f);
+        g_shakeIntensity = Mod::get()->getSavedValue<float>("save_shake", 12.0f);
 
-        if (CCNode* menu = this->getChildByID("my-levels-menu")) {
-            CCSprite* trashSpr = CCSprite::createWithSpriteFrameName("GJ_trashBtn_001.png");
-            CCMenuItemSpriteExtra* trashBtn = CCMenuItemSpriteExtra::create(trashSpr, this, menu_selector(TrashBrowserLayer::onTrashcan));
+        m_zoomInput = createInput("Zoom", 60, g_zoomMax, "save_zoom", &g_zoomMax);
+        m_intensityInput = createInput("Intensity", 0, g_bassIntensity, "save_intensity", &g_bassIntensity);
+        m_shakeInput = createInput("Shake", -60, g_shakeIntensity, "save_shake", &g_shakeIntensity);
 
-            menu->addChild(trashBtn);
-            menu->updateLayout();
+        auto closeBtn = CCMenuItemSpriteExtra::create(
+            CCSprite::createWithSpriteFrameName("GJ_closeBtn_001.png"),
+            this, menu_selector(MySettingsLayer::onClose));
+        closeBtn->setPosition({ -130, 110 });
+        m_buttonMenu->addChild(closeBtn);
 
-            m_fields->listener = UpdateTrashEvent().listen([this, trashSpr] {
-                const bool finnsTrashed = !Trashcan::get()->isLoaded() || !Trashcan::get()->getItems().empty();
+     
+        auto infoBtn = CCMenuItemSpriteExtra::create(
+            CCSprite::createWithSpriteFrameName("GJ_infoIcon_001.png"),
+            this, menu_selector(MySettingsLayer::onInfo));
+        infoBtn->setPosition({ 130, 110 });
+        m_buttonMenu->addChild(infoBtn);
 
-                trashSpr->setOpacity(finnsTrashed ? 255 : 205);
-                trashSpr->setColor(finnsTrashed ? ccWHITE : ccc3(90, 90, 90));
-                // Reload the page
-                this->loadPage(m_searchObject);
-            });
-
-            // Immediately load
-            UpdateTrashEvent().send();
-        }
-
+        this->setTouchEnabled(true);
+        this->setKeypadEnabled(true);
         return true;
     }
 
-    $override void onDeleteSelected(CCObject* sender) {
-        if (m_searchObject->m_searchType != SearchType::MyLevels) return LevelBrowserLayer::onDeleteSelected(sender);
+    TextInput* createInput(const char* labelStr, float y, float initialVal, std::string saveKey, float* globalVar) {
+        auto label = CCLabelBMFont::create(labelStr, "bigFont.fnt");
+        label->setScale(0.4f);
+        label->setPosition({0, y + 25});
+        m_buttonMenu->addChild(label);
 
-        size_t count = 0;
+        auto input = TextInput::create(100.f, labelStr, "chatFont.fnt");
+        input->setFilter("0123456789.");
+        
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(2) << initialVal;
+        input->setString(ss.str());
+        
+        input->setPosition({0, y});
+        
+        input->setCallback([saveKey, globalVar](const std::string& text) {
+            if (text.empty()) return;
+            try {
+                float val = std::stof(text);
+                *globalVar = val;
+                Mod::get()->setSavedValue(saveKey, val);
+            } catch(...) {}
+        });
 
-        for (auto level : CCArrayExt<GJGameLevel*>(m_levels)) {
-            if (level->m_selected) {
-                count += 1;
-            }
-        }
-
-        if (count > 0) {
-            FLAlertLayer* alert = FLAlertLayer::create(
-                this,
-                "Trash levels",
-                fmt::format(
-                    "Are you sure you want to <cr>trash</c> the <cp>{0}</c> selected level{1}?\n"
-                    "<cy>You can restore the level{1} or permanently delete {2} through the Trashcan.</c>",
-                    count, (count == 1 ? "" : "s"), (count == 1 ? "it" : "them")
-                ),
-                "Cancel", "Trash",
-                340
-            );
-
-            alert->setTag(5);
-            alert->m_button2->updateBGImage("GJ_button_06.png");
-            alert->show();
-        } else {
-            FLAlertLayer::create("Nothing here...", "No levels selected.", "OK")->show();
-        }
+        m_buttonMenu->addChild(input);
+        return input;
     }
 
-    void onTrashcan(CCObject*) {
-        if (!Trashcan::get()->isLoaded()) {
-            if (Result<> result = Trashcan::get()->load(); result.isErr()) {
-                log::warn("{}", result.unwrapErr());
-
-                Notification::create(
-                    fmt::format("Failed to load the trashcan.\n{}", std::move(result).unwrapErr()),
-                    NotificationIcon::None,
-                    0.5f
-                )->show();
-            } else {
-                this->onTrashcan(nullptr);
-            }
-        } else if (Trashcan::get()->getItems().empty()) {
-            FLAlertLayer::create(
-                "Trash is Empty",
-                "You have not <co>trashed</c> any levels!",
-                "OK"
-            )->show();
-        } else {
-            TrashcanPopup::create()->show();
-        }
+    void onInfo(CCObject*) {
+        FLAlertLayer::create(
+            "Help",
+            "<cy>Original Code by:</c> <cr>thesillydoggo</c> and <cp>EryManthus</c> luv for them <3!\n\n"
+            "<cg>Zoom:</c> How much the background scales with music.\n"
+            "<cg>Intensity:</c> Bass sensitivity.\n"
+            "<cg>Shake:</c> Background vibration.\n\n"
+            "<cy>PC:</c> Type with keyboard | <cg>Mobile:</c> Tap to type.",
+            "OK"
+        )->show();
     }
+    
+    void onClose(CCObject*) { this->removeFromParentAndCleanup(true); }
+    void keyBackClicked() override { onClose(nullptr); }
 };
 
-class $modify(EditLevelLayer) {
-    $override void confirmDelete(CCObject*) {
-        FLAlertLayer* alert = FLAlertLayer::create(
-            this,
-            "Trash level",
-            "Are you sure you want to <cr>trash</c> this level?\n"
-            "<cy>You can restore the level or permanently delete it through the Trashcan.</c>",
-            "Cancel", "Trash",
-            340
-        );
+class BGPulsingNode : public CCNode {
+public:
+    CCSprite* bg = nullptr;
+    FMOD::DSP* fftDSP = nullptr;
+    float smoothBass = 0.0f;
+    float baseScale = 1.0f;
+    CCPoint basePos;
 
-        alert->setTag(4);
-        alert->m_button2->updateBGImage("GJ_button_06.png");
-        alert->show();
+    static BGPulsingNode* create(CCSprite* bg) {
+        auto ret = new BGPulsingNode();
+        if (ret && ret->init(bg)) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+
+    bool init(CCSprite* target) {
+        if (!CCNode::init()) return false;
+        bg = target;
+        baseScale = bg->getScale();
+        basePos = bg->getPosition();
+
+        auto engine = FMODAudioEngine::sharedEngine();
+        auto sys = engine->m_system;
+        FMOD::ChannelGroup* master = nullptr;
+        sys->getMasterChannelGroup(&master);
+        sys->createDSPByType(FMOD_DSP_TYPE_FFT, &fftDSP);
+        fftDSP->setParameterInt(FMOD_DSP_FFT_WINDOWSIZE, 512);
+        master->addDSP(0, fftDSP);
+
+        scheduleUpdate();
+        return true;
+    }
+
+    void update(float dt) override {
+        if (!fftDSP || !bg) return;
+        
+        FMOD_DSP_PARAMETER_FFT* fft = nullptr;
+        fftDSP->getParameterData(FMOD_DSP_FFT_SPECTRUMDATA, (void**)&fft, nullptr, nullptr, 0);
+
+        float bass = 0.0f;
+        if (fft && fft->numchannels > 0 && fft->spectrum[0]) {
+            for (int i = 0; i < 8; i++) bass += fft->spectrum[0][i];
+            bass /= 8;
+        }
+        smoothBass += (bass - smoothBass) * dt * 14.0f;
+
+        float currentBassValue = smoothBass * g_bassIntensity;
+        bg->setScale(baseScale * (1.0f + (currentBassValue * g_zoomMax)));
+        
+        float shake = currentBassValue * g_shakeIntensity;
+        bg->setPosition({ 
+            basePos.x + CCRANDOM_MINUS1_1() * shake, 
+            basePos.y + CCRANDOM_MINUS1_1() * shake 
+        });
+    }
+
+    ~BGPulsingNode() { if (fftDSP) fftDSP->release(); }
+};
+
+class $modify(MyMenuLayer, MenuLayer) {
+    bool init() {
+        if (!MenuLayer::init()) return false;
+
+        g_zoomMax = Mod::get()->getSavedValue<float>("save_zoom", 1.0f);
+        g_bassIntensity = Mod::get()->getSavedValue<float>("save_intensity", 0.9f);
+        g_shakeIntensity = Mod::get()->getSavedValue<float>("save_shake", 12.0f);
+
+        auto bg = static_cast<CCSprite*>(this->getChildByID("main-menu-bg"));
+        if (bg) this->addChild(BGPulsingNode::create(bg), -1);
+
+        if (auto bottomMenu = this->getChildByID("bottom-menu")) {
+            auto sprite = CCSprite::createWithSpriteFrameName("GJ_optionsBtn02_001.png");
+            auto btn = CCMenuItemSpriteExtra::create(
+                sprite, this, menu_selector(MyMenuLayer::onCustomSettings)
+            );
+            bottomMenu->addChild(btn);
+            bottomMenu->updateLayout();
+        }
+        return true;
+    }
+
+    void onCustomSettings(CCObject* sender) {
+        MySettingsLayer::create()->show();
     }
 };
