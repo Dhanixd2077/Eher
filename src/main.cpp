@@ -196,7 +196,7 @@ class $modify(MyMenuLayer, MenuLayer) {
             );
             bottomMenu->addChild(btn);
 
-            // Botón extra para alternar visibilidad de los botones del menú
+            // Botón extra para alternar la visibilidad manteniendo la funcionalidad táctil
             auto hideSprite = CCSprite::createWithSpriteFrameName("GJ_optionsBtn_001.png");
             auto hideBtn = CCMenuItemSpriteExtra::create(
                 hideSprite, this, menu_selector(MyMenuLayer::onToggleHideButtons)
@@ -228,16 +228,11 @@ class $modify(MyMenuLayer, MenuLayer) {
         
         for (const char* name : menuNames) {
             if (auto menu = this->getChildByID(name)) {
-                auto children = menu->getChildren();
-                if (children) {
-                    for (int i = 0; i < children->count(); i++) {
-                        if (auto node = typeinfo_cast<CCNode*>(children->objectAtIndex(i))) {
-                            if (node->getID() == "invisible-toggle-btn"_spr) continue;
-                            
-                            // Opacidad a 0 los vuelve invisibles pero preserva el área táctil intacta
-                            node->setOpacity(hide ? 0 : 255);
-                        }
-                    }
+                for (auto* child : CCArrayExt<CCNode*>(menu->getChildren())) {
+                    if (child->getID() == "invisible-toggle-btn"_spr) continue;
+                    
+                    // Al bajar la opacidad a 0 se vuelven invisibles, pero conservan intacta su caja de colisión y eventos táctiles
+                    child->setOpacity(hide ? 0 : 255);
                 }
             }
         }
