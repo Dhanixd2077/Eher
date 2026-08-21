@@ -10,6 +10,7 @@ using namespace geode::prelude;
 float g_zoomMax = 1.0f;
 float g_bassIntensity = 0.9f;
 float g_shakeIntensity = 12.0f;
+bool g_hideMenuButtons = false; // Variable global para recordar el estado de ocultar/mostrar
 
 class MySettingsLayer : public FLAlertLayer {
     TextInput* m_zoomInput;
@@ -189,17 +190,66 @@ class $modify(MyMenuLayer, MenuLayer) {
         if (bg) this->addChild(BGPulsingNode::create(bg), -1);
 
         if (auto bottomMenu = this->getChildByID("bottom-menu")) {
+            // Tu botón de ajustes existente
             auto sprite = CCSprite::createWithSpriteFrameName("GJ_optionsBtn02_001.png");
             auto btn = CCMenuItemSpriteExtra::create(
                 sprite, this, menu_selector(MyMenuLayer::onCustomSettings)
             );
             bottomMenu->addChild(btn);
+
+            // Botón extra para ocultar/mostrar botones del menú (manteniéndolos clickeables)
+            auto hideSprite = CCSprite::createWithSpriteFrameName("GJ_lockBtn_001.png"); // O usa cualquier otro icono disponible
+            if (!hideSprite) hideSprite = CCSprite::createWithSpriteFrameName("GJ_optionsBtn_001.png");
+            
+            auto hideBtn = CCMenuItemSpriteExtra::create(
+                hideSprite, this, menu_selector(MyMenuLayer::onToggleHideButtons)
+            );
+            hideBtn->setID("invisible-toggle-btn"_spr);
+            bottomMenu->addChild(hideBtn);
+
             bottomMenu->updateLayout();
         }
+
+        // Aplicar estado inicial de visibilidad si ya estaba activado
+        if (g_hideMenuButtons) {
+            applyInvisibleState(true);
+        }
+
         return true;
     }
 
     void onCustomSettings(CCObject* sender) {
         MySettingsLayer::create()->show();
+    }
+
+    void onToggleHideButtons(CCObject* sender) {
+        g_hideMenuButtons = !g_hideMenuButtons;
+        applyInvisibleState(g_hideMenuButtons);
+    }
+
+    void applyInvisibleState(bool hide) {
+        // Recorremos los menús principales comunes de la pantalla de inicio para ocultar su contenido visualmente pero conservar el tacto
+        const char* menuNames[] = { "bottom-menu", "right-menu", "side-menu", "player-menu", "main-menu" };
+        
+        for (const char* name : menuNames) {
+            if (auto menu = this->getChildByID(name)) {
+                auto children = menu->getChildren();
+                if (children) {
+                    for (int i = 0; i < children->count(); i++) {
+                        if (auto node = static_pointer_cast<CCNode>(children->objectAtIndex(i))) {
+                            // No ocultamos nuestro propio botón de alternar para poder volver a darle clic
+                            if (node->getID() == "invisible-toggle-btn"_spr) continue;
+                            
+                            // Cambiamos la opacidad a 0 (invisible) en lugar de usar setVisible(false) 
+                            // para que los eventos táctiles/clicks sigan funcionando en su área.
+                            node->setOpacity(hide ? 0 : 255);
+                            
+                            // Si tienen hijos gráficos internos (como sprites), también podemos asegurarnos o manejarlos aquí
+                            // Opcional: deshabilitar children gráficos si fuera necesario, pero setOpacity(0) en CCMenuItemSpriteExtra suele bastar.
+                        }
+                    }
+                }
+            }
+        }
     }
 };
